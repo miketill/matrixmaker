@@ -4,5 +4,5 @@ sys.path = [os.path.dirname(__file__)]+sys.path
 os.chdir(os.path.dirname(__file__))
 
 import bottle
-import scfc
-application = scfc.app
+import mm
+application = matrixmaker.app
