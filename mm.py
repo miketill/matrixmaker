@@ -30,13 +30,15 @@ def favicon():
 
 @route('/')
 def index():
-    return template('index')
+    session = get_session()
+    return template('index', session=get_session(), matrices=get_matrices())
 
 @route('/account/logout')
 def logout():
     session = request.environ.get('beaker.session')
     session['logged_in'] = False
-    redirect('/'+request.query['m_id'])
+    session['user'] = None
+    redirect('/')
 
 @route('/account/create', method='POST')
 def create_account():
@@ -47,15 +49,15 @@ def create_account():
         db = conn.scfc
         r = db.users.find_one({'_id':email})
         if r == None:
-            pw_hash = bcrypt.hashpw(password, bcrypt.gensalt())
-            db.users.insert({'_id':email,'pw_hash':pw_hash,'admin':False})
+            pw_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            db.users.insert({'_id':email,'pw_hash':pw_hash})
     return login()
 
 @route('/account/login', method='POST')
 def login():
     email = request.forms.email
     password = request.forms.password
-    current_matrix = request.forms.matrix
+    current = request.forms.current
     if len(email) > 0 and len(password) > 0:
         conn = pymongo.Connection(conn_string)
         db = conn.scfc
@@ -64,13 +66,12 @@ def login():
         r = db.users.find_one({'_id':regex})
         if r:
             session = request.environ.get('beaker.session')
-            if r['pw_hash'] == bcrypt.hashpw(password, r['pw_hash']):
+            if r['pw_hash'] == bcrypt.hashpw(password.encode('utf-8'), r['pw_hash'].encode('utf-8')):
                 session['logged_in'] = True
                 session['user'] = r['_id']
-                session['admin'] = r['admin']
             else:
                 session['logged_in'] = False
-    redirect('/'+current_matrix)
+    redirect(current)
 
 @route('/<matrix_id>')
 def matrix(matrix_id):
@@ -79,22 +80,23 @@ def matrix(matrix_id):
         session['logged_in'] = False
 
     m = get_matrix(matrix_id)
+    is_admin = session.has_key('user') and session['user'] == m['owner']
     if m:
-        return template('matrix',m=m['matrix'],matrix_id=matrix_id,session=session)
+        return template('matrix',name=m['name'],m=m['matrix'],matrix_id=matrix_id,session=session,is_admin=is_admin)
     else:
         redirect('/')
 
 @route('/<matrix_id>/clear', method='POST')
 def clear_slot(matrix_id):
     session = request.environ.get('beaker.session')
-    if session['logged_in'] and session['admin']:
+    if session['logged_in']:
         m = request.forms.m
         x = request.forms.x
         y = request.forms.y
         if x and y and m:
             conn = pymongo.Connection(conn_string)
             db = conn.scfc
-            db.matrices.update({'_id':ObjectId(matrix_id)},{'$unset':{'matrix.'+m+'.3.'+x+'~'+y:1}})
+            db.matrices.update({'_id':ObjectId(matrix_id),'owner':session['user']},{'$unset':{'matrix.'+m+'.3.'+x+'~'+y:1}})
     redirect('/'+matrix_id)
 
 @route('/<matrix_id>', method='POST')
@@ -124,10 +126,29 @@ def save_matrix(matrix):
     db = conn.scfc
     db.matrices.save(matrix)
 
+def get_matrices():
+    session = get_session()
+    if not session['logged_in']:
+        return []
+    ms = get_users_matrices(session['user'])
+    return ms
+
+
+def get_users_matrices(email):
+    conn = pymongo.Connection(conn_string)
+    db = conn.scfc
+    return db.matrices.find({'owner':email}, ['name'])
+
 def get_matrix(matrix_id):
     conn = pymongo.Connection(conn_string)
     db = conn.scfc
     return db.matrices.find_one({'_id':ObjectId(matrix_id)})
+
+def get_session():
+    session = request.environ.get('beaker.session')
+    if not session.has_key('logged_in'):
+        session['logged_in'] = False
+    return session
 
 if __name__ == '__main__':
     bottle.run(app=app, host='localhost', port='8080', reloader=True, debug=True)

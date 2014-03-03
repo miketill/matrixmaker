@@ -47,6 +47,14 @@
                 </div>
             </div>
             <div class='row'>
+            <h2>
+            %if is_admin:
+              *
+            %end
+            {{name}}
+            </h2>
+            </div>
+            <div class='row'>
                 <hr>
                 %for matrix_number in range(len(m)):
                 %matrix = m[matrix_number]
@@ -66,7 +74,7 @@
                                 <td>{{y_name}}</td>
                                 %for x_name in matrix[1]:
                                     %if matrix[3].has_key(x_name+'~'+y_name):
-                                        %if session['logged_in'] and session['admin']:
+                                        %if is_admin:
                                             <td>
                                                 {{matrix[3][x_name+'~'+y_name]['name']}}<br>
                                                 {{matrix[3][x_name+'~'+y_name]['email']}}<br>
@@ -113,7 +121,7 @@
                 <button type='button' class='close' data-dismiss='modal' aria-hidden='true'>x</button>
                 <h3 id='create_account_label'>Please enter you information</h3>
                 <form id='create_account_form' action='/account/create' method='POST'>
-                    <input type='hidden' name='matrix' value='{{matrix_id}}'>
+                    <input type='hidden' name='current' value='/{{matrix_id}}'>
                     <div class="modal-body">
                         <label for='ca_email'>Email:</label><input id='ca_email' name='email'>
                         <label for='ca_password'>Password:</label><input type='password' id='ca_password' name='password'>
@@ -130,7 +138,7 @@
                 <button type='button' class='close' data-dismiss='modal' aria-hidden='true'>x</button>
                 <h3 id='login_account_label'>Please enter you information</h3>
                 <form id='login_account_form' action='/account/login' method='POST'>
-                    <input type='hidden' name='matrix' value='{{matrix_id}}'>
+                    <input type='hidden' name='current' value='/{{matrix_id}}'>
                     <div class="modal-body">
                         <label for='la_email'>Email:</label><input id='la_email' name='email'>
                         <label for='la_password'>Password:</label><input type='password' id='la_password' name='password'>
