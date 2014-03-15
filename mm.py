@@ -73,6 +73,19 @@ def login():
                 session['logged_in'] = False
     redirect(current)
 
+def is_user_admin(m):
+    session = request.environ.get('beaker.session')
+    if not session.has_key('user'):
+        return False
+    user = session['user']
+    if user == m['owner']:
+        return True
+    if m.has_key('admin_users'):
+        for au in m['admin_users']:
+            if au == user:
+                return True
+    return False
+
 @route('/<matrix_id>')
 def matrix(matrix_id):
     session = request.environ.get('beaker.session')
@@ -80,8 +93,8 @@ def matrix(matrix_id):
         session['logged_in'] = False
 
     m = get_matrix(matrix_id)
-    is_admin = session.has_key('user') and session['user'] == m['owner']
     if m:
+        is_admin = is_user_admin(m)
         return template('matrix',name=m['name'],m=m['matrix'],matrix_id=matrix_id,session=session,is_admin=is_admin)
     else:
         redirect('/')
@@ -90,13 +103,14 @@ def matrix(matrix_id):
 def clear_slot(matrix_id):
     session = request.environ.get('beaker.session')
     if session['logged_in']:
+        matrix = get_matrix(matrix_id)
         m = request.forms.m
         x = request.forms.x
         y = request.forms.y
-        if x and y and m:
+        if x and y and m and is_user_admin(matrix):
             conn = pymongo.Connection(conn_string)
             db = conn.scfc
-            db.matrices.update({'_id':ObjectId(matrix_id),'owner':session['user']},{'$unset':{'matrix.'+m+'.3.'+x+'~'+y:1}})
+            db.matrices.update({'_id':ObjectId(matrix_id)},{'$unset':{'matrix.'+m+'.3.'+x+'~'+y:1}})
     redirect('/'+matrix_id)
 
 @route('/<matrix_id>', method='POST')
